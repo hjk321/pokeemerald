@@ -1651,7 +1651,6 @@ void StartMassOutbreak(void)
     gSaveBlock1Ptr->outbreakPokemonMoves[1] = show->massOutbreak.moves[1];
     gSaveBlock1Ptr->outbreakPokemonMoves[2] = show->massOutbreak.moves[2];
     gSaveBlock1Ptr->outbreakPokemonMoves[3] = show->massOutbreak.moves[3];
-    gSaveBlock1Ptr->outbreakUnk4 = show->massOutbreak.var03;
     gSaveBlock1Ptr->outbreakPokemonProbability = show->massOutbreak.probability;
     gSaveBlock1Ptr->outbreakDaysLeft = 2;
 }
@@ -1791,7 +1790,6 @@ void EndMassOutbreak(void)
     gSaveBlock1Ptr->outbreakPokemonMoves[1] = MOVE_NONE;
     gSaveBlock1Ptr->outbreakPokemonMoves[2] = MOVE_NONE;
     gSaveBlock1Ptr->outbreakPokemonMoves[3] = MOVE_NONE;
-    gSaveBlock1Ptr->outbreakUnk4 = 0;
     gSaveBlock1Ptr->outbreakPokemonProbability = 0;
     gSaveBlock1Ptr->outbreakDaysLeft = 0;
 }

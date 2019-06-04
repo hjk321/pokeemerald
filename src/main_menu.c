@@ -35,6 +35,8 @@
 #include "text_window.h"
 #include "title_screen.h"
 #include "window.h"
+#include "load_save.h"
+#include "frontier_util.h"
 #include "mystery_gift.h"
 
 /*
@@ -181,6 +183,7 @@ static u32 InitMainMenu(bool8);
 static void Task_MainMenuCheckSaveFile(u8);
 static void Task_MainMenuCheckBattery(u8);
 static void Task_WaitForSaveFileErrorWindow(u8);
+static void Task_SaveBeginConversion(u8);
 static void CreateMainMenuErrorWindow(const u8*);
 static void ClearMainMenuWindowTilemap(const struct WindowTemplate*);
 static void Task_DisplayMainMenu(u8);
@@ -529,6 +532,8 @@ enum
 
 #define MAIN_MENU_BORDER_TILE   0x1D5
 
+EWRAM_DATA u8 gSaveConversionProgress = 0;
+
 static void CB2_MainMenu(void)
 {
     RunTasks();
@@ -669,6 +674,43 @@ static void Task_MainMenuCheckSaveFile(u8 taskId)
                 gTasks[taskId].func = Task_WaitForSaveFileErrorWindow;
                 break;
         }
+
+        switch (CheckSaveAge())
+        {
+            case SAVE_AGE_INVALID:
+                CreateMainMenuErrorWindow(gText_SaveFileInvalid);
+                gTasks[taskId].func = Task_WaitForSaveFileErrorWindow;
+                tMenuType = HAS_NO_SAVED_GAME;
+                break;
+            case SAVE_AGE_NEWER:
+                CreateMainMenuErrorWindow(gText_SaveFileNewer);
+                gTasks[taskId].func = Task_WaitForSaveFileErrorWindow;
+                tMenuType = HAS_NO_SAVED_GAME;
+                break;
+            case SAVE_AGE_OLDER:
+                switch (CheckSaveCompatibility())
+                {
+                    case SAVE_INCOMPATIBLE:
+                        StringExpandPlaceholders(gStringVar4, gText_SaveFileCannotConv);
+                        CreateMainMenuErrorWindow(gStringVar4);
+                        gTasks[taskId].func = Task_WaitForSaveFileErrorWindow;
+                        tMenuType = HAS_NO_SAVED_GAME;
+                        break;
+                    case SAVE_COMPATIBLE:
+                        // Let's go ahead and set the new save version to prevent
+                        // expensive duplicate checks when returning from options.
+                        gSaveBlock1Ptr->saveVersion = gSaveVersion;
+                        tMenuType = HAS_SAVED_GAME;
+                        break;
+                    case SAVE_COMPATIBLE_CONV:
+                        CreateMainMenuErrorWindow(gText_SaveFileBeginConv);
+                        gTasks[taskId].func = Task_SaveBeginConversion;
+                        tMenuType = HAS_SAVED_GAME;
+                        break;
+                }
+                break;
+        }
+
         if (sCurrItemAndOptionMenuCheck & OPTION_MENU_FLAG)   // are we returning from the options menu?
         {
             switch (tMenuType)  // if so, highlight the OPTIONS item
@@ -699,6 +741,35 @@ static void Task_WaitForSaveFileErrorWindow(u8 taskId)
         ClearWindowTilemap(7);
         ClearMainMenuWindowTilemap(&sWindowTemplates_MainMenu[7]);
         gTasks[taskId].func = Task_MainMenuCheckBattery;
+    }
+}
+
+void Task_SaveContinueConversion(u8 taskId)
+{
+    gSaveConversionProgress++;
+    if (gSaveConversionProgress > gSaveVersion)
+    {
+        // We're done converting so set the save version to prevent duplicate conversions
+        gSaveBlock1Ptr->saveVersion = gSaveVersion;
+        CreateMainMenuErrorWindow(gText_SaveFileEndConv);
+        gTasks[taskId].func = Task_WaitForSaveFileErrorWindow;
+    } else {
+        if (gSaveCompatibility[gSaveConversionProgress].convFunc != NULL)
+            gTasks[taskId].func = gSaveCompatibility[gSaveConversionProgress].convFunc;
+    }
+}
+
+static void Task_SaveBeginConversion(u8 taskId)
+{
+    RunTextPrinters();
+    if (!IsTextPrinterActive(7))
+    {
+        // Give the message some buffer time before converting
+        gSaveConversionProgress++;
+        if (gSaveConversionProgress > 80) {
+            gSaveConversionProgress = gSaveBlock1Ptr->saveVersion;
+            gTasks[taskId].func = Task_SaveContinueConversion;
+        }
     }
 }
 
@@ -1062,6 +1133,9 @@ static void Task_HandleMainMenuAPressed(u8 taskId)
                 gTasks[taskId].func = Task_NewGameBirchSpeech_Init;
                 break;
             case ACTION_CONTINUE:
+                // After save compatibility check, go ahead and set it to the current ROM's save version
+                gSaveBlock1Ptr->saveVersion = gSaveVersion;
+
                 gPlttBufferUnfaded[0] = RGB_BLACK;
                 gPlttBufferFaded[0] = RGB_BLACK;
                 SetMainCallback2(CB2_ContinueSavedGame);

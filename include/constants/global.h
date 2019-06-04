@@ -28,6 +28,7 @@
 
 #define GAME_VERSION (VERSION_EMERALD)
 #define GAME_LANGUAGE (LANGUAGE_ENGLISH)
+#define SAVE_VERSION 1
 
 // capacities of various saveblock objects
 #define DAYCARE_MON_COUNT 2

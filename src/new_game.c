@@ -206,6 +206,9 @@ void NewGameInitData(void)
     WipeTrainerNameRecords();
     ResetTrainerHillResults();
     ResetContestLinkResults();
+
+    // Initialize the current save version
+    gSaveBlock1Ptr->saveVersion = gSaveVersion;
 }
 
 static void ResetMiniGamesResults(void)

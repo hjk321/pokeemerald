@@ -13,6 +13,10 @@
 #include "gba/flash_internal.h"
 #include "decoration_inventory.h"
 #include "agb_flash.h"
+#include "save.h"
+#include "string_util.h"
+#include "strings.h"
+#include "main_menu.h"
 
 static void ApplyNewEncryptionKeyToAllEncryptedData(u32 encryptionKey);
 
@@ -294,4 +298,65 @@ static void ApplyNewEncryptionKeyToAllEncryptedData(u32 encryptionKey)
     ApplyNewEncryptionKeyToBerryPowder(encryptionKey);
     ApplyNewEncryptionKeyToWord(&gSaveBlock1Ptr->money, encryptionKey);
     ApplyNewEncryptionKeyToHword(&gSaveBlock1Ptr->coins, encryptionKey);
+}
+
+u8 CheckSaveAge (void) {
+    if (gSaveBlock1Ptr->saveVersion == gSaveVersion)
+        return SAVE_AGE_SAME;
+    else if (gSaveBlock1Ptr->saveVersion == 0) {
+        // Either we have an invalid save, or a save doesn't exist yet.
+        if(gSaveFileStatus == 0)
+            return SAVE_AGE_NEW_GAME;
+        else
+            return SAVE_AGE_INVALID;
+    }
+    else if (gSaveBlock1Ptr->saveVersion > gSaveVersion)
+        return SAVE_AGE_NEWER;
+    else if (gSaveBlock1Ptr->saveVersion < gSaveVersion)
+        return SAVE_AGE_OLDER;
+}
+
+u8 CheckSaveCompatibility (void) {
+    u8 i;
+    u8 result = SAVE_COMPATIBLE;
+
+    // We're assuming the save version is less than the current version
+    for (i = gSaveBlock1Ptr->saveVersion + 1; i <= gSaveVersion; i++) {
+        switch(gSaveCompatibility[i].compatibility) {
+            case SAVE_INCOMPATIBLE:
+                result = SAVE_INCOMPATIBLE;
+                StringCopy(gStringVar1, gVersionStringsTable[i-1]);
+                return result;
+            case SAVE_COMPATIBLE_CONV:
+                result = SAVE_COMPATIBLE_CONV;
+                break;
+        }
+    }
+    return result;
+}
+
+const u8 *const gVersionStringsTable[] =
+{
+    [SAVE_VERSION_INVALID] = gText_ThreeDashes,
+    [SAVE_VERSION_ALPHA1] = gText_Version_Alpha1,
+};
+
+const struct SaveCompatibility gSaveCompatibility[] =
+{
+    [SAVE_VERSION_INVALID] =
+    {
+        // Vanilla save id; invalid. Unused entry
+        .compatibility = SAVE_INCOMPATIBLE,
+        .convFunc = NULL,
+    },
+    [SAVE_VERSION_ALPHA1] =
+    {
+        .compatibility = SAVE_COMPATIBLE,
+        .convFunc = NULL,
+    },
+};
+
+void Task_SaveConversionTemplate(u8 taskId) {
+    // code
+    gTasks[taskId].func = Task_SaveContinueConversion;
 }

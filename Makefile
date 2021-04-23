@@ -346,3 +346,10 @@ berry_fix:
 
 libagbsyscall:
 	@$(MAKE) -C libagbsyscall TOOLCHAIN=$(TOOLCHAIN)
+
+SYMTAB := poke$(BUILD_NAME)_syms.dump
+
+symtab: $(SYMTAB)
+
+$(SYMTAB): $(ELF)
+	$(DEVKITARM)/bin/arm-none-eabi-nm $< | uniq > $@
